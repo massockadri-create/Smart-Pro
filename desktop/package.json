@@ -1,0 +1,1 @@
+{"name":"smart-pro-pc","version":"1.0.0","description":"Smart Pro - version ordinateur","author":"massockadri-create","main":"main.js","scripts":{"start":"electron .","dist":"electron-builder --win portable"},"devDependencies":{"electron":"31.7.7","electron-builder":"24.13.3"},"build":{"appId":"com.smartpro.pc","productName":"Smart Pro","win":{"target":"portable"}}}
