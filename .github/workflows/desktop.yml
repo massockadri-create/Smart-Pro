@@ -1,0 +1,22 @@
+name: Desktop
+on:
+  push:
+    paths: [ 'desktop/**' ]
+  workflow_dispatch:
+jobs:
+  win:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Smart-Pro-Windows
+          path: desktop/dist/*.exe
