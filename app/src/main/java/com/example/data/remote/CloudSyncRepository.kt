@@ -124,6 +124,20 @@ class CloudSyncRepository(private val db: FirebaseFirestore) {
                 )
             }
 
+    /** Supprime un document produit du cloud à partir de son identifiant (ex. produit créé sur PC). */
+    suspend fun deleteProductDoc(userId: String, docId: String): Result<Unit> {
+        val docRef = db.collection("users").document(userId).collection("sync_products").document(sanitizeDocId(docId))
+        return try {
+            docRef.delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.DELETE, docRef.path)
+            Result.failure(e)
+        }
+    }
+
     suspend fun upsertProduct(userId: String, product: ProductEntity): Result<String> {
         val docId = sanitizeDocId("prod_${product.id}_${product.sku}")
         val docRef = db.collection("users").document(userId).collection("sync_products").document(docId)
@@ -188,7 +202,7 @@ class CloudSyncRepository(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun upsertSale(userId: String, sale: SaleEntity, itemCount: Int): Result<String> {
+    suspend fun upsertSale(userId: String, sale: SaleEntity, itemCount: Int, items: List<com.example.data.local.SaleItemEntity> = emptyList()): Result<String> {
         val docId = sanitizeDocId("sale_${sale.invoiceNumber}")
         val docRef = db.collection("users").document(userId).collection("sync_sales").document(docId)
         return try {
@@ -218,7 +232,17 @@ class CloudSyncRepository(private val db: FirebaseFirestore) {
                     "createdAt" to FieldValue.serverTimestamp(),
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
-                docRef.set(payload).await()
+                val itemsPayload = items.take(200).map {
+                    mapOf<String, Any>(
+                        "pid" to sanitizeDocId("prod_${it.productId}_${it.sku}"),
+                        "name" to it.productName.take(120),
+                        "sku" to it.sku.take(64),
+                        "qty" to it.quantity.toLong(),
+                        "price" to it.unitPrice,
+                        "cost" to it.purchasePrice
+                    )
+                }
+                docRef.set(if (itemsPayload.isEmpty()) payload else payload + ("items" to itemsPayload)).await()
             }
             Result.success(docId)
         } catch (e: CancellationException) {

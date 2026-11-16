@@ -105,6 +105,7 @@ data class CloudSale(
     val status: String = "VALIDEE",
     val itemCount: Long = 1L,
     val clientCreatedAt: Long = 0L,
+    val items: List<Map<String, Any>> = emptyList(),
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
