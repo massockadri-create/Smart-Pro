@@ -969,6 +969,91 @@ class StoreRepository(
     }
 
     // --- Products & Categories ---
+    /**
+     * Synchro entrante (cloud -> téléphone) : applique dans la base locale les produits et ventes
+     * créés ou modifiés depuis la version ordinateur. Le plus récent gagne (clientUpdatedAt).
+     */
+    suspend fun applyCloudChanges(
+        cloudUid: String,
+        products: List<com.example.data.remote.CloudProduct>,
+        sales: List<com.example.data.remote.CloudSale>
+    ) {
+        val local = catalogDao.getProductsOnce()
+        for (c in products) {
+            if (c.status !in listOf("ACTIF", "INACTIF", "ARCHIVE") || c.name.isBlank()) continue
+            val key = c.sku.ifBlank { c.name }.trim().lowercase()
+            val match = if (c.localId > 0L) {
+                local.firstOrNull { it.id == c.localId }
+            } else {
+                local.firstOrNull { it.sku.ifBlank { it.name }.trim().lowercase() == key }
+            }
+            if (match == null) {
+                if (c.localId > 0L) continue // supprimé sur le téléphone : on ne le recrée pas
+                val newId = catalogDao.insertProduct(
+                    ProductEntity(
+                        name = c.name, reference = c.sku.ifBlank { "REF-WEB" }, sku = c.sku, barcode = c.barcode,
+                        categoryId = 0L, categoryName = c.categoryName,
+                        purchasePrice = c.purchasePrice, sellingPrice = c.sellingPrice,
+                        stockQuantity = c.stockQuantity.toInt(), minThreshold = c.minThreshold.toInt(),
+                        unit = c.unit, status = c.status,
+                        createdAt = c.clientUpdatedAt, updatedAt = c.clientUpdatedAt, syncStatus = "SYNCED"
+                    )
+                )
+                val saved = catalogDao.getProductById(newId) ?: continue
+                // Republier sous l'identifiant du téléphone, puis retirer le doublon créé par le PC
+                if (cloudSync.upsertProduct(cloudUid, saved).isSuccess) cloudSync.deleteProductDoc(cloudUid, c.id)
+            } else {
+                var current = match
+                if (c.clientUpdatedAt > match.updatedAt) {
+                    current = match.copy(
+                        name = c.name, sku = c.sku, barcode = c.barcode, categoryName = c.categoryName,
+                        purchasePrice = c.purchasePrice, sellingPrice = c.sellingPrice,
+                        stockQuantity = c.stockQuantity.toInt(), minThreshold = c.minThreshold.toInt(),
+                        unit = c.unit, status = c.status, updatedAt = c.clientUpdatedAt, syncStatus = "SYNCED"
+                    )
+                    catalogDao.updateProduct(current)
+                }
+                if (c.localId == 0L && cloudSync.upsertProduct(cloudUid, current).isSuccess) {
+                    cloudSync.deleteProductDoc(cloudUid, c.id)
+                }
+            }
+        }
+        val byInvoice = salesDao.getSalesOnce().associateBy { it.invoiceNumber }
+        for (c in sales) {
+            val s = byInvoice[c.invoiceNumber]
+            if (s == null) {
+                val newSaleId = salesDao.insertSale(
+                    SaleEntity(
+                        invoiceNumber = c.invoiceNumber,
+                        customerName = c.customerName.ifBlank { "Client Comptant" },
+                        userId = 0L, userName = c.cashierName,
+                        subtotal = c.totalAmount, totalAmount = c.totalAmount,
+                        totalCost = c.totalAmount - c.profit, profit = c.profit,
+                        paymentMethod = c.paymentMethod, amountPaid = c.totalAmount,
+                        status = c.status, syncStatus = "SYNCED",
+                        createdAt = if (c.clientCreatedAt > 0L) c.clientCreatedAt else System.currentTimeMillis()
+                    )
+                )
+                val lines = c.items.mapNotNull { m ->
+                    val qty = (m["qty"] as? Number)?.toInt() ?: return@mapNotNull null
+                    val sku = (m["sku"] as? String).orEmpty()
+                    val name = (m["name"] as? String).orEmpty()
+                    val price = (m["price"] as? Number)?.toDouble() ?: 0.0
+                    val cost = (m["cost"] as? Number)?.toDouble() ?: 0.0
+                    val prod = local.firstOrNull { sku.isNotBlank() && it.sku == sku } ?: local.firstOrNull { it.name == name }
+                    SaleItemEntity(
+                        saleId = newSaleId, productId = prod?.id ?: 0L, productName = name, sku = sku,
+                        quantity = qty, unitPrice = price, purchasePrice = cost,
+                        lineTotal = price * qty, lineProfit = (price - cost) * qty
+                    )
+                }
+                if (lines.isNotEmpty()) salesDao.insertSaleItems(lines)
+            } else if (c.status == "ANNULEE" && s.status != "ANNULEE") {
+                salesDao.updateSale(s.copy(status = "ANNULEE", syncStatus = "SYNCED"))
+            }
+        }
+    }
+
     suspend fun saveProduct(actor: UserEntity, product: ProductEntity, isNew: Boolean, cloudUid: String?): Long {
         val now = System.currentTimeMillis()
         val settings = adminDao.getSettingsOnce() ?: StoreSettingsEntity()
@@ -2202,7 +2287,7 @@ class StoreRepository(
             val pendingSales = salesDao.getPendingSyncSales()
             for (s in pendingSales) {
                 val items = salesDao.getSaleItems(s.id)
-                if (cloudSync.upsertSale(cloudUid, s, items.size.coerceAtLeast(1)).isSuccess) {
+                if (cloudSync.upsertSale(cloudUid, s, items.size.coerceAtLeast(1), items).isSuccess) {
                     salesDao.markSaleSynced(s.id)
                     syncedCount++
                 }
