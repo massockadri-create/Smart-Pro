@@ -172,8 +172,9 @@ service cloud.firestore {
                          incoming().keys().hasOnly([
                            'userId', 'invoiceNumber', 'customerName', 'cashierName',
                            'totalAmount', 'profit', 'paymentMethod', 'status',
-                           'itemCount', 'clientCreatedAt', 'createdAt', 'updatedAt'
+                           'itemCount', 'clientCreatedAt', 'createdAt', 'updatedAt', 'items'
                          ]) &&
+                         (!('items' in incoming()) || (incoming().items is list && incoming().items.size() <= 200)) &&
                          isValidCloudSale(incoming(), userId);
 
         // Terminal state lock: ANNULEE sales cannot be re-opened
