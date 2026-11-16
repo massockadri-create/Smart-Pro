@@ -289,6 +289,20 @@ class SmartStoreViewModel(
             repository.ensureSeeded()
             _uiState.update { it.copy(isDatabaseReady = true) }
         }
+        // Synchro entrante : applique sur le téléphone ce qui vient de l'ordinateur
+        viewModelScope.launch {
+            combine(cloudProducts, cloudSales) { p, s -> p to s }.collect { (p, s) ->
+                if (currentCloudUid.isNotBlank()) {
+                    try {
+                        repository.applyCloudChanges(currentCloudUid, p, s)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.e("CloudPull", "Synchro entrante: ${e.message}")
+                    }
+                }
+            }
+        }
         startDesktopServer(silent = true)
         // Push real-time snapshots to the embedded LAN Desktop Web Portal
         viewModelScope.launch {
