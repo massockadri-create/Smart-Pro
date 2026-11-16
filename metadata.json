@@ -1,0 +1,6 @@
+{
+  "name": "Smart Store Pro",
+  "description": "Logiciel professionnel de gestion commerciale et de point de vente (POS) adapté aux commerces du Cameroun (FCFA / XAF).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "CloudStoreProfile": {
+      "title": "CloudStoreProfile",
+      "description": "Synchronized store identity (name, city, location, structure type, adapted logo)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth owner UID" },
+        "storeName": { "type": "string", "description": "Business structure name" },
+        "city": { "type": "string", "description": "Structure city" },
+        "location": { "type": "string", "description": "Quarter or physical site location" },
+        "address": { "type": "string", "description": "Street address" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "email": { "type": "string", "description": "Email address" },
+        "structureType": { "type": "string", "description": "Structure business category" },
+        "logoKey": { "type": "string", "description": "Selected structure logo preset key" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": [
+        "userId",
+        "storeName",
+        "city",
+        "location",
+        "address",
+        "phone",
+        "email",
+        "structureType",
+        "logoKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudProduct": {
+      "title": "CloudProduct",
+      "description": "Synchronized store product catalog record in FCFA (XAF)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth owner UID" },
+        "localId": { "type": "integer", "description": "Room local primary key ID" },
+        "name": { "type": "string", "description": "Product name" },
+        "sku": { "type": "string", "description": "SKU code" },
+        "barcode": { "type": "string", "description": "Barcode string" },
+        "categoryName": { "type": "string", "description": "Category label" },
+        "purchasePrice": { "type": "number", "description": "Purchase unit price in FCFA" },
+        "sellingPrice": { "type": "number", "description": "Selling unit price in FCFA" },
+        "stockQuantity": { "type": "integer", "description": "Current stock quantity" },
+        "minThreshold": { "type": "integer", "description": "Minimum stock alert threshold" },
+        "unit": { "type": "string", "description": "Unit of measure" },
+        "status": { "type": "string", "enum": ["ACTIF", "INACTIF", "ARCHIVE"] },
+        "clientUpdatedAt": { "type": "integer", "description": "Client epoch ms for conflict resolution" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": [
+        "userId",
+        "localId",
+        "name",
+        "sku",
+        "barcode",
+        "categoryName",
+        "purchasePrice",
+        "sellingPrice",
+        "stockQuantity",
+        "minThreshold",
+        "unit",
+        "status",
+        "clientUpdatedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudSale": {
+      "title": "CloudSale",
+      "description": "Synchronized POS sale transaction in FCFA (XAF)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth owner UID" },
+        "invoiceNumber": { "type": "string", "description": "Unique receipt/invoice number" },
+        "customerName": { "type": "string", "description": "Customer display name" },
+        "cashierName": { "type": "string", "description": "Staff user who processed the sale" },
+        "totalAmount": { "type": "number", "description": "Net sale total in FCFA" },
+        "profit": { "type": "number", "description": "Net profit in FCFA" },
+        "paymentMethod": { "type": "string", "description": "Payment mode (Especes, Orange Money, MTN MoMo, etc.)" },
+        "status": { "type": "string", "enum": ["VALIDEE", "ANNULEE"] },
+        "itemCount": { "type": "integer", "description": "Number of line items sold" },
+        "clientCreatedAt": { "type": "integer", "description": "Client creation epoch ms" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": [
+        "userId",
+        "invoiceNumber",
+        "customerName",
+        "cashierName",
+        "totalAmount",
+        "profit",
+        "paymentMethod",
+        "status",
+        "itemCount",
+        "clientCreatedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CloudAuditLog": {
+      "title": "CloudAuditLog",
+      "description": "Immutable cloud audit trail entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth owner UID" },
+        "staffName": { "type": "string", "description": "Operator full name" },
+        "action": { "type": "string", "description": "Human-readable audit action" },
+        "module": { "type": "string", "description": "Module name" },
+        "details": { "type": "string", "description": "Old and new values summary" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": ["userId", "staffName", "action", "module", "details", "createdAt"]
+    },
+    "CloudBackup": {
+      "title": "CloudBackup",
+      "description": "Cloud store JSON backup snapshot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth owner UID" },
+        "label": { "type": "string", "description": "Backup label" },
+        "backupType": { "type": "string", "enum": ["AUTOMATIQUE", "MANUELLE"] },
+        "recordCount": { "type": "integer", "description": "Total records backed up" },
+        "summary": { "type": "string", "description": "Summary of contents" },
+        "payloadJson": { "type": "string", "description": "Serialized backup payload" },
+        "createdByName": { "type": "string", "description": "Staff user name" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": [
+        "userId",
+        "label",
+        "backupType",
+        "recordCount",
+        "summary",
+        "payloadJson",
+        "createdByName",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/sync_store_profile/{profileId}": {
+      "schema": { "$ref": "#/entities/CloudStoreProfile" },
+      "description": "User-scoped synchronized store identity, city, location, and adapted logo"
+    },
+    "/users/{userId}/sync_products/{productId}": {
+      "schema": { "$ref": "#/entities/CloudProduct" },
+      "description": "User-scoped synchronized product catalog"
+    },
+    "/users/{userId}/sync_sales/{saleId}": {
+      "schema": { "$ref": "#/entities/CloudSale" },
+      "description": "User-scoped synchronized POS sales"
+    },
+    "/users/{userId}/sync_audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/CloudAuditLog" },
+      "description": "Immutable user-scoped audit log entries"
+    },
+    "/users/{userId}/sync_backups/{backupId}": {
+      "schema": { "$ref": "#/entities/CloudBackup" },
+      "description": "User-scoped cloud backup snapshots"
+    }
+  }
+}

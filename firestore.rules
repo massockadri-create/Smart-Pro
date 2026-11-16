@@ -1,0 +1,232 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCloudStoreProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.storeName is string && data.storeName.size() >= 1 && data.storeName.size() <= 160 &&
+             data.city is string && data.city.size() <= 100 &&
+             data.location is string && data.location.size() <= 160 &&
+             data.address is string && data.address.size() <= 200 &&
+             data.phone is string && data.phone.size() <= 64 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.structureType is string && data.structureType.size() >= 1 && data.structureType.size() <= 40 &&
+             data.logoKey is string && data.logoKey.size() >= 1 && data.logoKey.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudProduct(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.localId is int && data.localId >= 0 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+             data.sku is string && data.sku.size() <= 64 &&
+             data.barcode is string && data.barcode.size() <= 64 &&
+             data.categoryName is string && data.categoryName.size() <= 80 &&
+             (data.purchasePrice is int || data.purchasePrice is float) && data.purchasePrice >= 0 &&
+             (data.sellingPrice is int || data.sellingPrice is float) && data.sellingPrice >= 0 &&
+             data.stockQuantity is int && data.stockQuantity >= 0 &&
+             data.minThreshold is int && data.minThreshold >= 0 &&
+             data.unit is string && data.unit.size() <= 32 &&
+             data.status in ['ACTIF', 'INACTIF', 'ARCHIVE'] &&
+             data.clientUpdatedAt is int && data.clientUpdatedAt > 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudSale(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.invoiceNumber is string && data.invoiceNumber.size() >= 1 && data.invoiceNumber.size() <= 64 &&
+             data.customerName is string && data.customerName.size() <= 120 &&
+             data.cashierName is string && data.cashierName.size() >= 1 && data.cashierName.size() <= 120 &&
+             (data.totalAmount is int || data.totalAmount is float) && data.totalAmount >= 0 &&
+             (data.profit is int || data.profit is float) &&
+             data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 64 &&
+             data.status in ['VALIDEE', 'ANNULEE'] &&
+             data.itemCount is int && data.itemCount >= 1 &&
+             data.clientCreatedAt is int && data.clientCreatedAt > 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCloudAuditLog(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.staffName is string && data.staffName.size() >= 1 && data.staffName.size() <= 120 &&
+             data.action is string && data.action.size() >= 1 && data.action.size() <= 300 &&
+             data.module is string && data.module.size() >= 1 && data.module.size() <= 80 &&
+             data.details is string && data.details.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidCloudBackup(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.label is string && data.label.size() >= 1 && data.label.size() <= 160 &&
+             data.backupType in ['AUTOMATIQUE', 'MANUELLE'] &&
+             data.recordCount is int && data.recordCount >= 0 &&
+             data.summary is string && data.summary.size() <= 400 &&
+             data.payloadJson is string && data.payloadJson.size() >= 2 && data.payloadJson.size() <= 700000 &&
+             data.createdByName is string && data.createdByName.size() >= 1 && data.createdByName.size() <= 120 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get, list, write: if false;
+
+      match /sync_store_profile/{profileId} {
+        allow get: if isOwner(userId) && isValidId(profileId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(profileId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'storeName', 'city', 'location', 'address',
+                           'phone', 'email', 'structureType', 'logoKey', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'storeName', 'city', 'location', 'address',
+                           'phone', 'email', 'structureType', 'logoKey', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCloudStoreProfile(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(profileId) &&
+                         isValidCloudStoreProfile(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'storeName', 'city', 'location', 'address',
+                           'phone', 'email', 'structureType', 'logoKey', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(profileId);
+      }
+
+      match /sync_products/{productId} {
+        allow get: if isOwner(userId) && isValidId(productId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(productId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'localId', 'name', 'sku', 'barcode', 'categoryName',
+                           'purchasePrice', 'sellingPrice', 'stockQuantity', 'minThreshold',
+                           'unit', 'status', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'localId', 'name', 'sku', 'barcode', 'categoryName',
+                           'purchasePrice', 'sellingPrice', 'stockQuantity', 'minThreshold',
+                           'unit', 'status', 'clientUpdatedAt', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCloudProduct(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(productId) &&
+                         isValidCloudProduct(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().localId == existing().localId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'name', 'sku', 'barcode', 'categoryName', 'purchasePrice',
+                           'sellingPrice', 'stockQuantity', 'minThreshold', 'unit',
+                           'status', 'clientUpdatedAt', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(productId);
+      }
+
+      match /sync_sales/{saleId} {
+        allow get: if isOwner(userId) && isValidId(saleId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(saleId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'invoiceNumber', 'customerName', 'cashierName',
+                           'totalAmount', 'profit', 'paymentMethod', 'status',
+                           'itemCount', 'clientCreatedAt', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'invoiceNumber', 'customerName', 'cashierName',
+                           'totalAmount', 'profit', 'paymentMethod', 'status',
+                           'itemCount', 'clientCreatedAt', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCloudSale(incoming(), userId);
+
+        // Terminal state lock: ANNULEE sales cannot be re-opened
+        allow update: if isOwner(userId) &&
+                         isValidId(saleId) &&
+                         isValidCloudSale(incoming(), userId) &&
+                         existing().status != 'ANNULEE' &&
+                         incoming().userId == existing().userId &&
+                         incoming().invoiceNumber == existing().invoiceNumber &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().clientCreatedAt == existing().clientCreatedAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        allow delete: if false;
+      }
+
+      match /sync_audit_logs/{logId} {
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow list: if isOwner(userId);
+
+        // Immutable append-only audit log
+        allow create: if isOwner(userId) &&
+                         isValidId(logId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'staffName', 'action', 'module', 'details', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'staffName', 'action', 'module', 'details', 'createdAt'
+                         ]) &&
+                         isValidCloudAuditLog(incoming(), userId);
+
+        allow update, delete: if false;
+      }
+
+      match /sync_backups/{backupId} {
+        allow get: if isOwner(userId) && isValidId(backupId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(backupId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'label', 'backupType', 'recordCount',
+                           'summary', 'payloadJson', 'createdByName', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'label', 'backupType', 'recordCount',
+                           'summary', 'payloadJson', 'createdByName', 'createdAt'
+                         ]) &&
+                         isValidCloudBackup(incoming(), userId);
+
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(backupId);
+      }
+    }
+  }
+}
