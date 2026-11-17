@@ -856,30 +856,7 @@ fun ReceiptAndInvoiceDialog(
     ) { uri ->
         if (uri != null) {
             context.contentResolver.openOutputStream(uri)?.use { out ->
-                val lines = mutableListOf(
-                    "FACTURE OFFICIELLE N° ${invoice.invoiceNumber}",
-                    "Ticket associé : ${sale.invoiceNumber}",
-                    "Date : ${Formatters.dateTime(invoice.createdAt)}",
-                    "Client : ${invoice.customerName}",
-                    "Mode de paiement : ${invoice.paymentMethod}",
-                    "----------------------------------------------------------------",
-                    "ARTICLES :"
-                )
-                items.forEach {
-                    val code = it.productInvoiceCode.ifBlank {
-                        Formatters.productInvoiceCode(invoice.invoiceNumber, it.categoryName)
-                    }
-                    val barcode = it.productBarcode.ifBlank { it.sku }
-                    lines.add("[$code] ${it.productName} (CB: $barcode) x${it.quantity} @ ${Formatters.fcfa(it.unitPrice)} = ${Formatters.fcfa(it.lineTotal)}")
-                }
-                lines.add("----------------------------------------------------------------")
-                lines.add("Sous-total : ${Formatters.fcfa(invoice.subtotalHt)}")
-                lines.add("Remise     : ${Formatters.fcfa(invoice.discountAmount)}")
-                lines.add("TVA        : ${Formatters.fcfa(invoice.taxAmount)}")
-                lines.add("TOTAL TTC  : ${Formatters.fcfa(invoice.totalTtc)}")
-                lines.add("Payé       : ${Formatters.fcfa(invoice.amountPaid)}")
-                lines.add("Monnaie    : ${Formatters.fcfa(sale.changeGiven)}")
-                DocumentExporter.writePdfReport(out, "Facture ${invoice.invoiceNumber}", "${settings.storeName} · ${settings.city} (${settings.location})", lines)
+                DocumentExporter.writeInvoicePdf(out, settings, invoice, items, sale.changeGiven)
             }
         }
     }
@@ -1589,28 +1566,7 @@ private fun InvoiceDetailDialog(
         if (uri != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { out ->
-                    val lines = mutableListOf(
-                        "${invoice.invoiceType} N° ${invoice.invoiceNumber}",
-                        "Date : ${Formatters.dateTimeWithSeconds(invoice.createdAt)}",
-                        "Client : ${invoice.customerName}",
-                        "Statut : ${invoice.status} · Mode : ${invoice.paymentMethod}",
-                        "----------------------------------------------------------------"
-                    )
-                    if (items.isEmpty()) {
-                        lines.add("Prestation directe : ${Formatters.fcfa(invoice.subtotalHt)}")
-                    } else {
-                        items.forEach {
-                            val code = it.productInvoiceCode.ifBlank { Formatters.productInvoiceCode(invoice.invoiceNumber, it.categoryName) }
-                            val barcode = it.productBarcode.ifBlank { it.sku }
-                            lines.add("[$code] ${it.productName} (CB: $barcode) x${it.quantity} = ${Formatters.fcfa(it.lineTotal)}")
-                        }
-                    }
-                    lines.add("----------------------------------------------------------------")
-                    lines.add("HT : ${Formatters.fcfa(invoice.subtotalHt)} · Remise : ${Formatters.fcfa(invoice.discountAmount)}")
-                    lines.add("TVA (${Formatters.percent(invoice.taxRate)}) : ${Formatters.fcfa(invoice.taxAmount)}")
-                    lines.add("TOTAL TTC : ${Formatters.fcfa(invoice.totalTtc)}")
-                    lines.add("Payé : ${Formatters.fcfa(invoice.amountPaid)} · Reste : ${Formatters.fcfa(invoice.balanceDue)}")
-                    DocumentExporter.writePdfReport(out, invoice.invoiceNumber, "${settings.storeName} · ${settings.city} (${settings.location})", lines)
+                    DocumentExporter.writeInvoicePdf(out, settings, invoice, items)
                 }
             }
         }
