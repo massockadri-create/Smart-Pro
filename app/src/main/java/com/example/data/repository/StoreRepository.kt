@@ -1022,6 +1022,8 @@ class StoreRepository(
         for (c in sales) {
             val s = byInvoice[c.invoiceNumber]
             if (s == null) {
+                // On n'importe que les ventes faites sur PC : une vente supprimée ici ne revient pas.
+                if (!c.invoiceNumber.startsWith("WEB-")) continue
                 val newSaleId = salesDao.insertSale(
                     SaleEntity(
                         invoiceNumber = c.invoiceNumber,
